@@ -208,19 +208,40 @@ public class FriendController {
     // -> 친구를 특정 그룹에 추가하는 기능
     // =============
     @PostMapping("/groups/members")
-    public ResponseEntity<?> addFriendToGroup(
+    public ResponseEntity<?> addFriendsToGroup(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody AddFriendToGroupRequest request) {
         try {
-            friendGroupService.addFriendToGroup(
+            // 단일 친구 추가 (하위 호환성 유지) - friendshipIds가 1개인 경우
+            if (request.getFriendshipIds() == null || request.getFriendshipIds().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("추가할 친구를 선택해주세요.");
+            }
+
+            // 여러 친구 추가
+            AddFriendsToGroupResultDto result = friendGroupService.addMultipleFriendsToGroup(
                     userDetails.getUser().getId(),
-                    request.getFriendshipId(),
+                    request.getFriendshipIds(),
                     request.getGroupId());
-            return ResponseEntity.ok("그룹에 친구가 추가되었습니다.");
+
+            // 모두 성공한 경우
+            if (result.getFailedCount() == 0) {
+                return ResponseEntity.ok(result);
+            }
+            // 일부 실패한 경우 (부분 성공)
+            else if (result.getSuccessCount() > 0) {
+                return ResponseEntity.status(HttpStatus.MULTI_STATUS).body(result);
+            }
+            // 모두 실패한 경우
+            else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
+
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
 
     // =============
     // 그룹에서 친구 제거 API

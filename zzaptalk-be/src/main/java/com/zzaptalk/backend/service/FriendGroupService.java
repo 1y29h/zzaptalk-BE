@@ -94,6 +94,73 @@ public class FriendGroupService {
         friendGroupMappingRepository.save(mapping);
     }
 
+    /**
+     * 여러 친구를 한 번에 그룹에 추가
+     * @return 성공한 개수와 실패 정보를 담은 DTO
+     */
+    public AddFriendsToGroupResultDto addMultipleFriendsToGroup(
+            Long currentUserId,
+            List<Long> friendshipIds,
+            Long groupId) {
+
+        // 1. groupId 먼저 검증 (모든 친구에 공통적으로 적용)
+        FriendGroup group = friendGroupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹을 찾을 수 없습니다."));
+
+        // 2. 그룹 권한 검증
+        if (!group.getUser().getId().equals(currentUserId)) {
+            throw new IllegalArgumentException("본인의 그룹에만 친구를 추가할 수 있습니다.");
+        }
+
+        // 3. 결과 추적용 변수
+        int successCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        // 4. 각 친구를 순회하며 추가
+        for (Long friendshipId : friendshipIds) {
+            try {
+                // 4-1. 중복 체크
+                if (friendGroupMappingRepository.existsByFriendshipIdAndFriendGroupId(
+                        friendshipId, groupId)) {
+                    errors.add("친구 ID " + friendshipId + ": 이미 그룹에 추가되어 있습니다.");
+                    continue; // 다음 친구로 진행
+                }
+
+                // 4-2. Friendship 존재 여부 확인
+                Friendship friendship = friendshipRepository.findById(friendshipId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "친구 관계를 찾을 수 없습니다."));
+
+                // 4-3. 권한 검증 (해당 friendship이 현재 사용자의 것인지)
+                if (!friendship.getUser().getId().equals(currentUserId)) {
+                    errors.add("친구 ID " + friendshipId + ": 본인의 친구만 추가할 수 있습니다.");
+                    continue;
+                }
+
+                // 4-4. 매핑 생성 및 저장
+                FriendGroupMapping mapping = FriendGroupMapping.builder()
+                        .friendship(friendship)
+                        .friendGroup(group)
+                        .build();
+
+                friendGroupMappingRepository.save(mapping);
+                successCount++;
+
+            } catch (Exception e) {
+                errors.add("친구 ID " + friendshipId + ": " + e.getMessage());
+            }
+        }
+
+        // 5. 결과 반환
+        return AddFriendsToGroupResultDto.builder()
+                .totalRequested(friendshipIds.size())
+                .successCount(successCount)
+                .failedCount(friendshipIds.size() - successCount)
+                .errors(errors)
+                .build();
+    }
+
+
     // ===========
     // 11. 그룹에서 친구 제거 메서드 추가
     //     -> 그룹에서만 제거하고 친구관계는 유지해야되서

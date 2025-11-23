@@ -1,6 +1,7 @@
 package com.zzaptalk.backend.dto;
 
 import lombok.*;
+import java.util.List;
 
 @Getter
 @Setter
@@ -8,6 +9,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class AddFriendToGroupRequest {
-    private Long friendshipId;  // 친구 관계 ID
+    private List<Long> friendshipIds;  // 친구 관계 ID + 복수형(배열)
     private Long groupId;       // 추가할 그룹 ID
 }

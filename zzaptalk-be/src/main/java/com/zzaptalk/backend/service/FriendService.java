@@ -39,9 +39,16 @@ public class FriendService {
         // 1. 데이터 조회 (Fetch Join)
         List<Friendship> friendships = friendshipRepository.findByUserWithFetchJoin(currentUser);
 
+        // MESSAGE_AND_PROFILE로 나를 차단한 사용자 ID 목록 조회
+        List<Long> blockedByUserIds = friendBlockRepository.findBlockingUserIdsWithProfileHidden(currentUser);
+
         // 2. 분류 작업
         FriendListClassifier classifier = new FriendListClassifier(LocalDate.now());
         for (Friendship fs : friendships) {
+            // 나를 MESSAGE_AND_PROFILE로 차단한 사용자는 제외
+            if (blockedByUserIds.contains(fs.getFriend().getId())) {
+                continue;
+            }
             FriendSummaryDto dto = FriendSummaryDto.from(fs);
             classifier.classify(dto, fs);
         }
@@ -186,8 +193,12 @@ public class FriendService {
         List<Friendship> friendships = friendshipRepository
                 .findByUserAndFriendNicknameContaining(currentUser, nicknameQuery);
 
-        // 2. DTO로 변환하여 반환
+        // MESSAGE_AND_PROFILE로 나를 차단한 사용자 ID 목록 조회
+        List<Long> blockedByUserIds = friendBlockRepository.findBlockingUserIdsWithProfileHidden(currentUser);
+
+        // 2. DTO로 변환하면서 차단된 사용자는 제외
         return friendships.stream()
+                .filter(fs -> !blockedByUserIds.contains(fs.getFriend().getId()))
                 .map(FriendSummaryDto::from)
                 .collect(Collectors.toList());
     }
