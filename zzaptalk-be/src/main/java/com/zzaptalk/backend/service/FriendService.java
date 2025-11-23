@@ -1,14 +1,8 @@
 package com.zzaptalk.backend.service;
 
 import com.zzaptalk.backend.dto.*;
-import com.zzaptalk.backend.entity.FriendGroup;
-import com.zzaptalk.backend.entity.FriendGroupMapping;
-import com.zzaptalk.backend.entity.Friendship;
-import com.zzaptalk.backend.entity.User;
-import com.zzaptalk.backend.repository.FriendGroupMappingRepository;
-import com.zzaptalk.backend.repository.FriendGroupRepository;
-import com.zzaptalk.backend.repository.FriendshipRepository;
-import com.zzaptalk.backend.repository.UserRepository;
+import com.zzaptalk.backend.entity.*;
+import com.zzaptalk.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +20,7 @@ public class FriendService {
     private final FriendshipRepository friendshipRepository;
     private final FriendGroupRepository friendGroupRepository;
     private final FriendGroupMappingRepository friendGroupMappingRepository;
+    private final FriendBlockRepository friendBlockRepository;  // 사용자 차단 관련
 
     // =========================================================================
     // 1. 친구 목록 조회 (메인 로직)
@@ -51,7 +46,7 @@ public class FriendService {
             classifier.classify(dto, fs);
         }
 
-        // 3. 결과 반환
+        // 5. 결과 반환
         return classifier.buildResponse();
     }
 
@@ -192,7 +187,6 @@ public class FriendService {
                 .findByUserAndFriendNicknameContaining(currentUser, nicknameQuery);
 
         // 2. DTO로 변환하여 반환
-        // -> FriendSummaryDto 에 정적 팩토리 메서드 추가 후 코드 개선
         return friendships.stream()
                 .map(FriendSummaryDto::from)
                 .collect(Collectors.toList());
@@ -204,16 +198,21 @@ public class FriendService {
     @Transactional(readOnly = true)
     public FriendProfileDto getFriendProfile(User currentUser, Long friendUserId) {
 
-        // 1. 친구 찾기
         User friend = userRepository.findById(friendUserId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        // 2. 친구 관계 확인
         if (!friendshipRepository.existsByUserAndFriend(currentUser, friend)) {
             throw new IllegalArgumentException("친구 관계가 아닙니다.");
         }
 
-        // 3. DTO 변환
+        // 추가: 상대가 나를 MESSAGE_AND_PROFILE로 차단했는지 확인
+        friendBlockRepository.findByUserAndBlockedUser(friend, currentUser)
+                .ifPresent(block -> {
+                    if (block.getBlockType() == BlockType.MESSAGE_AND_PROFILE) {
+                        throw new IllegalArgumentException("프로필을 조회할 수 없습니다.");
+                    }
+                });
+
         return FriendProfileDto.builder()
                 .userId(friend.getId())
                 .name(friend.getName())
@@ -225,6 +224,7 @@ public class FriendService {
                 .birthday(friend.getBirthday())
                 .build();
     }
+
 
     // =========================================================================
     // 5. 친구 설정 업데이트 (즐겨찾기)
@@ -307,4 +307,6 @@ public class FriendService {
 
         friendshipRepository.delete(friendship);
     }
+
+
 }

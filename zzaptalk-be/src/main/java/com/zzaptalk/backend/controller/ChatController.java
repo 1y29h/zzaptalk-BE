@@ -45,6 +45,13 @@ public class ChatController {
         // ChatMessageService에 해당 메서드가 있다고 가정합니다.
         User sender = chatMessageService.findUserById(senderId);
 
+        // ChatMessageService에 새로운 메서드 필요
+        chatMessageService.validateAndSendMessage(
+                request.getRoomId(),
+                sender,
+                request.getContent()
+        );
+
         // 메시지 저장 및 DB 업데이트(ChatMessageService 호출)
         ChatMessage savedMessage = chatMessageService.saveAndPublishMessage(
                 request.getRoomId(),
