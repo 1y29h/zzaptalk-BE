@@ -45,15 +45,10 @@ public class ChatController {
         // ChatMessageService에 해당 메서드가 있다고 가정합니다.
         User sender = chatMessageService.findUserById(senderId);
 
-        // ChatMessageService에 새로운 메서드 필요
-        chatMessageService.validateAndSendMessage(
-                request.getRoomId(),
-                sender,
-                request.getContent()
-        );
-
         // 메시지 저장 및 DB 업데이트(ChatMessageService 호출)
-        ChatMessage savedMessage = chatMessageService.saveAndPublishMessage(
+        // 검증 + 저장 한번에 처리
+        // 오류 날 때 -> "saveAndPublishMessage" 로 바꾸기 (원래 검증로직 없던 저장만하는 것)
+        ChatMessage savedMessage = chatMessageService.validateAndSendMessage(
                 request.getRoomId(),
                 sender,
                 request.getContent()
