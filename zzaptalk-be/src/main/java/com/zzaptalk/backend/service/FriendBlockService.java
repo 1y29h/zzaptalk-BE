@@ -6,6 +6,7 @@ import com.zzaptalk.backend.dto.BlockedFriendListResponseDto;
 import com.zzaptalk.backend.dto.UpdateBlockRequest;
 import com.zzaptalk.backend.entity.BlockType;
 import com.zzaptalk.backend.entity.FriendBlock;
+import com.zzaptalk.backend.entity.Friendship;
 import com.zzaptalk.backend.entity.User;
 import com.zzaptalk.backend.repository.FriendBlockRepository;
 import com.zzaptalk.backend.repository.FriendshipRepository;
@@ -13,6 +14,7 @@ import com.zzaptalk.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,14 +42,16 @@ public class FriendBlockService {
         }
 
         // 3. 친구 관계 확인
-        if (!friendshipRepository.existsByUserAndFriend(currentUser, userToBlock)) {
-            throw new IllegalArgumentException("친구 관계가 아닙니다.");
-        }
+        Friendship friendship = friendshipRepository.findByUserAndFriend(currentUser, userToBlock)
+                .orElseThrow(() -> new IllegalArgumentException("친구 관계가 아닙니다."));
 
         // 4. 이미 차단한 경우 확인
         if (friendBlockRepository.existsByUserAndBlockedUser(currentUser, userToBlock)) {
             throw new IllegalArgumentException("이미 차단한 사용자입니다.");
         }
+
+        // 5. 친구 관계 삭제 (차단하면 친구 목록에서 제거)
+        friendshipRepository.delete(friendship);
 
         // 5. FriendBlock 생성 및 저장
         FriendBlock block = FriendBlock.builder()
@@ -90,7 +94,14 @@ public class FriendBlockService {
 
         // 3. 차단 해제 (BlockType.NONE)
         if (request.getBlockType() == BlockType.NONE) {
+            // 3-1. 차단 해제
             friendBlockRepository.delete(block);
+            // 3-2. 친구 관계 복원
+            Friendship restoreFriendship = Friendship.builder()
+                    .user(currentUser)
+                    .friend(blockedUser)
+                    .isFavorite(false) // 기본값으로 복원
+            .build();
         } else {
             // 4. 차단 타입 변경
             block.setBlockType(request.getBlockType());

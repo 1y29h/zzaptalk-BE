@@ -48,7 +48,7 @@ public class FriendGroupController {
     // -> 사용자가 자신이 만든 그룹 목록을 볼 수 있어야 함
     // ================
     @GetMapping("/groups")
-    public ResponseEntity<?> createGroup(   // 메서드명 동일
+    public ResponseEntity<?> getGroup(   // 메서드명 동일
                                             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         try {
