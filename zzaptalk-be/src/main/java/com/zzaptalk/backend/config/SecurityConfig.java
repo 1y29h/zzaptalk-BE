@@ -59,7 +59,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/users/signup",
                                 "/api/v1/users/login",
-                                "/ws/**"
+                                "/ws/**",
+                                "/redis-test"
                         ).permitAll()
 
                         .requestMatchers(
