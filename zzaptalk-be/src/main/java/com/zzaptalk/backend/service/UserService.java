@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -101,7 +102,12 @@ public class UserService {
 
         // 모든 식별자가 비어있을 경우(Controller에서 @Valid로 대부분 걸러지지만, 방어 코드)
         throw new IllegalArgumentException("로그인 식별자(전화번호/이메일/ZzapID) 중 하나를 입력해야 합니다.");
-
     }
 
+    // UserService.java 에 있어야 할 메서드
+    @Transactional(readOnly = true)
+    public User findById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+    }
 }

@@ -26,8 +26,14 @@ public class JwtTokenProvider {
     private String secretKey;
 
     // application-local.yml에서 expiration 주입
-    @Value("${jwt.expiration}")
-    private long tokenExpiration;
+//    @Value("${jwt.expiration}")
+//    private long tokenExpiration;
+
+    @Value("${jwt.access-expiration}")
+    private long accessExpiration;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpiration;
 
     private Key key;
     private final CustomUserDetailsService userDetailsService;
@@ -48,11 +54,10 @@ public class JwtTokenProvider {
     // JWT 토큰 생성 메서드
     // -------------------------------------------------------------------------
 
-    // 로그인에 성공한 User 객체를 받아 JWT 토큰 생성
-    public String createToken(User user) {
+    // Access Tocken 생성
+    public String createAccessToken(User user) {
 
         // Claims(토큰에 담을 정보) 설정
-        // 토큰 주제(sub)는 User ID로 설정
         String identifier = String.valueOf(user.getId());
 
         Claims claims = Jwts.claims().setSubject(identifier);
@@ -62,7 +67,7 @@ public class JwtTokenProvider {
 
         // 만료 시간 설정
         Date now = new Date();
-        Date validity = new Date(now.getTime() + tokenExpiration);
+        Date validity = new Date(now.getTime() + accessExpiration);
 
         // 토큰 빌드 및 서명
         return Jwts.builder()
@@ -71,7 +76,23 @@ public class JwtTokenProvider {
                 .setExpiration(validity)                    // 토큰 만료 시간
                 .signWith(key, SignatureAlgorithm.HS256)    // 서명 알고리즘 및 비밀 키 사용
                 .compact();                                 // 토큰 압축
+    }
 
+    // Refresh Token 생성
+    public String createRefreshToken(User user) {
+        String identifier = String.valueOf(user.getId());
+        Claims claims = Jwts.claims().setSubject(identifier);
+        claims.put("userId", user.getId()); // 재발급시 userId 추출용
+
+        Date now = new Date();
+        Date validity = new Date(now.getTime() + refreshExpiration);
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setIssuedAt(now)
+                .setExpiration(validity)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
 
     // -------------------------------------------------------------------------
@@ -123,6 +144,38 @@ public class JwtTokenProvider {
             return false;
         }
 
+    }
+
+    // =================================
+    // 토큰에서 userId 추출
+    // ==================================
+    public Long getUserIdFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.get("userId", Long.class);
+    }
+
+    // ======================
+    // 토큰의 남은 만료시간 계산 (밀리초)
+    // 로그아웃 시 Redis TTL 설정에 사용
+    // ==============================
+    public long getRemainingTime(String token) {
+        Date expiration = Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getExpiration();
+
+        long now = System.currentTimeMillis();
+        long remaning = expiration.getTime() - now;
+
+        // 음수면 0 반환 (이미 만료된 경우)
+        return Math.max(remaning, 0);
     }
 
 }

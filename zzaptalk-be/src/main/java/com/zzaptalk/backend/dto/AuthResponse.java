@@ -9,8 +9,11 @@ import lombok.Getter;
 @Builder
 public class AuthResponse {
 
-    // JWT 토큰
+    // AT
     private String accessToken;
+
+    // RT
+    private String refreshToken;
 
     // 토큰 타입(항상 "Bearer")
     private String tokenType;

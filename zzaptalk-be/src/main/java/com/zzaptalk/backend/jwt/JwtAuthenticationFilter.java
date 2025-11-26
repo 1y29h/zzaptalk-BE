@@ -1,5 +1,6 @@
 package com.zzaptalk.backend.jwt;
 
+import com.zzaptalk.backend.service.RedisService;
 import com.zzaptalk.backend.util.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,10 +14,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Slf4j
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final RedisService redisService;
+
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, RedisService redisService) {
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.redisService = redisService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -29,6 +35,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 토큰 유효성 검사 및 인증 처리
             if (token != null && jwtTokenProvider.validateToken(token)) {
+
+                // Redis 블랙리스트 확인
+                if (redisService.isBlacklisted(token)) {
+                    throw new RuntimeException("로그아웃된 토큰입니다.");
+                }
+
                 Authentication authentication = jwtTokenProvider.getAuthentication(token);
                 log.info("JWT 인증 성공: 사용자 ID = {}", authentication.getName());
                 SecurityContextHolder.getContext().setAuthentication(authentication);

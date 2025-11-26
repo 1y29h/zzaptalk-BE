@@ -1,6 +1,7 @@
 package com.zzaptalk.backend.config;
 
 import com.zzaptalk.backend.jwt.JwtAuthenticationFilter;
+import com.zzaptalk.backend.service.RedisService;
 import com.zzaptalk.backend.util.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +28,7 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final RedisService redisService;
 
     // -------------------------------------------------------------------------
     // Http 보안 설정
@@ -59,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/users/signup",
                                 "/api/v1/users/login",
+                                "/api/v1/users/refresh",
                                 "/ws/**",
                                 "/redis-test"
                         ).permitAll()
@@ -75,7 +78,7 @@ public class SecurityConfig {
                 // JWT 인증 필터 등록
                 // Spring Security 기본 필터인 UsernamePasswordAuthenticationFilter 이전에 실행
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider),
+                        new JwtAuthenticationFilter(jwtTokenProvider,redisService),
                         UsernamePasswordAuthenticationFilter.class
                 );
 

@@ -1,10 +1,9 @@
 package com.zzaptalk.backend.controller;
 
 import com.zzaptalk.backend.dto.*;
+import com.zzaptalk.backend.entity.RefreshToken;
 import com.zzaptalk.backend.entity.User;
-import com.zzaptalk.backend.service.CustomUserDetails;
-import com.zzaptalk.backend.service.ProfileService;
-import com.zzaptalk.backend.service.UserService;
+import com.zzaptalk.backend.service.*;
 import com.zzaptalk.backend.util.JwtTokenProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +16,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import com.zzaptalk.backend.dto.MyProfileResponse;
 import com.zzaptalk.backend.dto.UpdateProfileRequest;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -26,6 +28,8 @@ public class UserController {
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final ProfileService profileService;
+    private final RefreshTokenService refreshTokenService;
+    private final RedisService redisService;
 
     // -------------------------------------------------------------------------
     // 회원가입(Sign Up) API 엔드포인트
@@ -65,36 +69,40 @@ public class UserController {
     public ResponseEntity<?> login(@Valid @RequestBody UserLoginRequest request) {
 
         try {
-            // Service 계층에서 사용자 조회 및 비밀번호 검증
+            // 1. 사용자 인증
             User loggedInUser = userService.login(request);
-            // 로그인 성공 시 JWT 토큰 생성
-            String jwtToken = jwtTokenProvider.createToken(loggedInUser);
 
-            // 응답 DTO 빌드
+            // 2. Access Token 생성 (30분)
+            String accessToken = jwtTokenProvider.createAccessToken(loggedInUser);
+
+            // 3. Refresh Token 생성 (14일)
+            String refreshToken = jwtTokenProvider.createRefreshToken(loggedInUser);
+
+            // 4. Refresh Token을 해싱하여 RDS에 저장
+            LocalDateTime expiryDate = LocalDateTime.now().plusDays(14);
+            refreshTokenService.saveRefreshToken(
+                    loggedInUser.getId(),
+                    refreshToken, // 원본 토크 전달 (Service에서 해싱)
+                    expiryDate
+            );
+
+            // 5. 응답 생성 (AT, RT 모두 반환)
             AuthResponse response = AuthResponse.builder()
-                    .accessToken(jwtToken)
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken) // 클라이언트에는 원본 전달
                     .tokenType("Bearer")
-                    // 1시간 (3600000ms)으로 하드코딩 가정
-                    .expiresIn(3600000L)
-                    // 사용자 정보를 응답에 포함해야 한다면 주석 해제
+                    .expiresIn(1800000L) // 30분
                     .userId(loggedInUser.getId())
                     .nickname(loggedInUser.getNickname())
                     .build();
 
-            // HTTP 200 OK 응답과 함께 토큰 반환
             return ResponseEntity.ok(response);
-        }
-
-        catch (IllegalArgumentException e) {
-            // 사용자 정보 불일치(ID/비밀번호 오류) 예외 처리(400 Bad Request)
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("로그인 중 서버 오류가 발생했습니다.");
         }
-
-        catch (Exception e) {
-            // 기타 서버 오류 처리(500 Internal Server Error)
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("로그인 중 서버 오류가 발생했습니다.");
-        }
-
     }
 
     // -------------------------------------------------------------------------
@@ -161,6 +169,84 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("프로필 수정 중 오류가 발생했습니다.");
+        }
+    }
+
+// ===============================
+// 로그아웃 API
+// POST / api/v1/users/logout
+// ================================
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(
+            @RequestHeader ("Authorization") String authHeader,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ){
+        try{
+            // 1. Authorization 헤더에서 Access Token 추출
+            String accessToken = authHeader.substring(7); // "Bearer " 제거
+
+            // 2. Access Token을 Redis 블랙리스트에 등록
+            long remainingTime = jwtTokenProvider.getRemainingTime(accessToken);
+            if (remainingTime > 0){
+                redisService.addToBlacklist(accessToken, remainingTime);
+            }
+
+            // 3. Refresh Token 삭제 (RDS)
+            refreshTokenService.deleteByUserId(userDetails.getUserId());
+            return ResponseEntity.ok("로그아웃이 완료되었습니다.");
+        }
+
+        catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("로그아웃 중 오류가 발생했습니다.");
+        }
+    }
+
+    /**
+     * Access Token 재발급 API
+     * POST /api/v1/users/refresh
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> request) {
+        try {
+            String refreshToken = request.get("refreshToken");
+
+            // 1. Refresh Token 형식 검증 (JWT 파싱)
+            if (!jwtTokenProvider.validateToken(refreshToken)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("유효하지 않은 Refresh Token입니다.");
+            }
+
+            // 2. RT에서 userId 추출
+            Long userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
+
+            // 3. DB에서 해시값 조회 후 matches() 비교 (핵심!)
+            RefreshToken validToken = refreshTokenService.validateRefreshToken(refreshToken, userId);
+
+            // 4. User 조회
+            User user = userService.findById(validToken.getUserId());
+
+            // 5. 새로운 Access Token 발급
+            String newAccessToken = jwtTokenProvider.createAccessToken(user);
+
+            // 6. 응답 (기존 RT 재사용)
+            AuthResponse response = AuthResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(refreshToken)  // 기존 RT 유지
+                    .tokenType("Bearer")
+                    .expiresIn(1800000L)
+                    .userId(user.getId())
+                    .nickname(user.getNickname())
+                    .build();
+
+            return ResponseEntity.ok(response);
+        }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        }
+        catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("토큰 재발급 중 오류가 발생했습니다.");
         }
     }
 }
