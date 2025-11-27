@@ -1,5 +1,6 @@
 package com.zzaptalk.backend.dto;
 
+import com.zzaptalk.backend.entity.BlockType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,5 +18,7 @@ public class ChatRoomResponse {
     private int unreadCount;                  // 안 읽은 메시지 수
     private String lastMessageContent;        // 마지막 메시지 내용
     private LocalDateTime lastMessageTime;    // 마지막 메시지 시간
+    private boolean isBlocked;          // 내가 상대를 차단했는지
+    private BlockType blockType;        // 차단 타입 (MESSAGE_ONLY, MESSAGE_AND_PROFILE)
 
 }

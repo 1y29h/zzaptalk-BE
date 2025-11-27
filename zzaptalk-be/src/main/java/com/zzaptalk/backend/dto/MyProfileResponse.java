@@ -7,14 +7,14 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
-/**
- * 친구 프로필 상세 조회 응답 DTO
+/*
+ * 본인 프로필 조회/수정 응답 DTO
  */
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserProfileDto {
+public class MyProfileResponse {
 
     // 사용자 ID
     private Long userId;
@@ -39,4 +39,9 @@ public class UserProfileDto {
 
     // 생일
     private LocalDate birthday;
+
+    // === 나중에 추가 가능한 필드들 (본인만 볼 수 있는 정보) ===
+    // private String email;           // 이메일
+    // private String phoneNum;        // 전화번호 (마스킹 안함)
+    // private LocalDateTime createdAt; // 가입일
 }

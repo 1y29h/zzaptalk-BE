@@ -1,14 +1,7 @@
 package com.zzaptalk.backend.service;
 
-import com.zzaptalk.backend.entity.MessageType;
-import com.zzaptalk.backend.entity.ChatMessage;
-import com.zzaptalk.backend.entity.ChatRoom;
-import com.zzaptalk.backend.entity.ChatRoomUser;
-import com.zzaptalk.backend.entity.User;
-import com.zzaptalk.backend.repository.ChatMessageRepository;
-import com.zzaptalk.backend.repository.ChatRoomRepository;
-import com.zzaptalk.backend.repository.ChatRoomUserRepository;
-import com.zzaptalk.backend.repository.UserRepository;
+import com.zzaptalk.backend.entity.*;
+import com.zzaptalk.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +16,7 @@ public class ChatMessageService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomUserRepository chatRoomUserRepository;
     private final UserRepository userRepository;
+    private final FriendBlockService friendBlockService;
 
     // -------------------------------------------------------------------------
     // 사용자 ID로 User 엔티티 조회 (ChatController에서 사용)
@@ -102,5 +96,55 @@ public class ChatMessageService {
         return chatMessageRepository.findAllByChatRoomOrderBySentAtAsc(chatRoom);
 
     }
+
+    // 메시지 전송 전 차단 여부 확인
+    // 개인 채팅방인 경우에만 차단 확인
+    public void validateMessageSend(ChatRoom chatRoom, User sender, User receiver) {
+
+        // 단체 채팅방은 차단 무시
+        if (chatRoom.getType() == ChatRoomType.GROUP) {
+            return;
+        }
+
+        // 개인 채팅만 차단 검증
+        if (friendBlockService.isBlocked(sender, receiver)) {
+            throw new IllegalArgumentException("차단한 사용자에게 메시지를 보낼 수 없습니다.");
+        }
+
+        if (friendBlockService.isBlockedBy(sender, receiver)) {
+            throw new IllegalArgumentException("상대방이 회원님의 메시지를 수신하지 않습니다(차단됨).");
+        }
+    }
+
+    /**
+     * 메시지 전송 전 차단 확인 및 메시지 저장
+     * - 개인 채팅방: 차단 여부 확인
+     * - 단체 채팅방: 차단 무시
+     */
+    @Transactional
+    public ChatMessage validateAndSendMessage(Long roomId, User sender, String content) {
+
+        // 1. 채팅방 조회
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("채팅방 ID를 찾을 수 없습니다: " + roomId));
+
+        // 2. 개인 채팅방인 경우 차단 확인
+        if (chatRoom.getType() == ChatRoomType.SINGLE) {
+            // 2-1. 상대방 찾기
+            User receiver = chatRoomUserRepository.findAllByChatRoom(chatRoom).stream()
+                    .map(ChatRoomUser::getUser)
+                    .filter(user -> !user.getId().equals(sender.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("상대방을 찾을 수 없습니다."));
+
+            // 2-2. 차단 확인
+            validateMessageSend(chatRoom, sender, receiver);
+        }
+        // 3. 단체 채팅방은 차단 무시 (바로 메시지 저장)
+
+        // 4. 메시지 저장 (기존 로직 재사용)
+        return saveAndPublishMessage(roomId, sender, content);
+    }
+
 
 }
