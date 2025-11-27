@@ -132,13 +132,13 @@ public class FriendBlockService {
         return friendBlockRepository.existsByUserAndBlockedUser(targetUser, currentUser);
     }
 
-    /**
-     * 차단 정보 조회 (메시지 전송 가능 여부 확인용)
-     */
-    @Transactional(readOnly = true)
-    public BlockType getBlockType(User currentUser, User targetUser) {
-        return friendBlockRepository.findByUserAndBlockedUser(currentUser, targetUser)
-                .map(FriendBlock::getBlockType)
-                .orElse(BlockType.NONE);
-    }
+//    /**
+//     * 차단 정보 조회 (메시지 전송 가능 여부 확인용)
+//     */
+//    @Transactional(readOnly = true)
+//    public BlockType getBlockType(User currentUser, User targetUser) {
+//        return friendBlockRepository.findByUserAndBlockedUser(currentUser, targetUser)
+//                .map(FriendBlock::getBlockType)
+//                .orElse(BlockType.NONE);
+//    }
 }
