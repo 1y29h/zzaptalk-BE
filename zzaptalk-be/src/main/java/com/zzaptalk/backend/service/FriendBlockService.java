@@ -102,6 +102,9 @@ public class FriendBlockService {
                     .friend(blockedUser)
                     .isFavorite(false) // 기본값으로 복원
             .build();
+
+            friendshipRepository.save(restoreFriendship);
+
         } else {
             // 4. 차단 타입 변경
             block.setBlockType(request.getBlockType());
