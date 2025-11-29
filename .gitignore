@@ -46,7 +46,8 @@
 
 # Gradle
 .gradle
-!/gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
 
 # =========================================================================
 # IDE FILES (통합 개발 환경 파일)
@@ -79,3 +80,7 @@ application-local.properties
 *.key
 *.pem
 *.cer
+
+# 프론트엔드 빌드 결과물 무시
+src/main/resources/static/assets/
+node_modules/

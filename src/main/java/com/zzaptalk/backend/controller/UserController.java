@@ -202,7 +202,7 @@ public class UserController {
         }
     }
 
-    /**
+    /*
      * Access Token 재발급 API
      * POST /api/v1/users/refresh
      */
@@ -247,6 +247,46 @@ public class UserController {
         catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("토큰 재발급 중 오류가 발생했습니다.");
+        }
+    }
+
+
+    // =========================================================================
+    // 회원 탈퇴 API
+    // DELETE /api/v1/users/account
+    // =========================================================================
+
+    /*
+     * 회원 탈퇴 처리
+     *
+     * 처리 내용:
+     * 1. Access Token 블랙리스트 등록
+     * 2. Refresh Token 삭제
+     * 3. 모든 연관 데이터 정리
+     * 4. 개인정보 마스킹
+     * 5. 상태를 DELETED로 변경
+     */
+    @DeleteMapping("/account")
+    public ResponseEntity<?> deleteAccount(
+            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            // Authorization 헤더에서 Access Token 추출
+            String accessToken = authHeader.substring(7); // "Bearer " 제거
+
+            // 회원 탈퇴 처리
+            userService.deleteAccount(userDetails.getUserId(), accessToken);
+
+            return ResponseEntity.ok("회원 탈퇴가 완료되었습니다.");
+
+        } catch (IllegalArgumentException e) {
+            // 비즈니스 로직 에러 (이미 탈퇴한 계정 등)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+
+        } catch (Exception e) {
+            // 예상치 못한 서버 에러
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("회원 탈퇴 중 오류가 발생했습니다.");
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.zzaptalk.backend.service;
 
 import com.zzaptalk.backend.entity.User;
+import com.zzaptalk.backend.entity.UserStatus;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

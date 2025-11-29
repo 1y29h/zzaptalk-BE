@@ -29,6 +29,10 @@ public interface FriendBlockRepository extends JpaRepository<FriendBlock, Long> 
     @Query("SELECT fb.blockedUser.id FROM FriendBlock fb WHERE fb.user = :user")
     List<Long> findBlockedUserIdsByUser(@Param("user") User user);
 
+    // 회원 탈퇴 관련 쿼리
+    @Query ("SELECT fb FROM FriendBlock fb WHERE fb.blockedUser = :blockedUser")
+    List<FriendBlock> findByBlockedUser(@Param("blockedUser") User blockedUser);
+
     // 나를 차단한 사용자 ID 리스트
     @Query("SELECT fb.user.id FROM FriendBlock fb WHERE fb.blockedUser = :user")
     List<Long> findBlockingUserIdsByBlockedUser(@Param("user") User user);

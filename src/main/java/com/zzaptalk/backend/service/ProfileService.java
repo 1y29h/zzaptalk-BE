@@ -3,6 +3,7 @@ package com.zzaptalk.backend.service;
 import com.zzaptalk.backend.dto.MyProfileResponse;
 import com.zzaptalk.backend.dto.UpdateProfileRequest;
 import com.zzaptalk.backend.entity.User;
+import com.zzaptalk.backend.entity.UserStatus;
 import com.zzaptalk.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,11 @@ public class ProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
+        // 탈퇴한 계정인지 확인
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new IllegalArgumentException("탈퇴한 계정입니다.");
+        }
+
         return buildMyProfileResponse(user);
     }
 
@@ -35,6 +41,11 @@ public class ProfileService {
     public MyProfileResponse updateMyProfile(Long userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // 탈퇴한 계정인지 확인
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new IllegalArgumentException("탈퇴한 계정입니다.");
+        }
 
         // null이 아닌 필드만 업데이트 (부분 업데이트)
         if (request.getNickname() != null && !request.getNickname().isBlank()) {
@@ -63,7 +74,7 @@ public class ProfileService {
     // 3. 내부 헬퍼 메서드
     // =========================================================================
 
-    /**
+    /*
      * User 엔티티를 MyProfileResponse DTO로 변환
      */
     private MyProfileResponse buildMyProfileResponse(User user) {
@@ -79,7 +90,7 @@ public class ProfileService {
                 .build();
     }
 
-    /**
+    /*
      * 프로필 사진 URL이 없으면 기본 이미지 반환
      */
     private String getProfilePhotoUrlOrDefault(String profilePhotoUrl) {

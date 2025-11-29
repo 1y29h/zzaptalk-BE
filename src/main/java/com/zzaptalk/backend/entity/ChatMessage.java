@@ -22,7 +22,7 @@ public class ChatMessage {
 
     // FK: 메시지를 보낸 사용자
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "senderId", nullable = false)
+    @JoinColumn(name = "senderId", nullable = true)
     private User sender;
 
     // 메시지 내용(최대 길이 고려)

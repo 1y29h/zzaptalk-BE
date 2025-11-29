@@ -46,6 +46,16 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
             "LEFT JOIN FETCH f.friend " +
             "LEFT JOIN FETCH f.groupMappings gm " +
             "LEFT JOIN FETCH gm.friendGroup " +
-            "WHERE f.user = :user")
+            "WHERE f.user = :user " +
+            "AND f.friend.status = 'ACTIVE'")  // 활성 친구만 조회
     List<Friendship> findByUserWithFetchJoin(@Param("user") User user);
+
+    // -------------------------------------------------------------------------
+    // 회원 탈퇴 관련 쿼리
+    // -------------------------------------------------------------------------
+
+    // 특정 유저를 친구로 가진 모든 Friendship 조회 (회원 탈퇴 시 정리용)
+    @Query("SELECT f FROM Friendship f WHERE f.friend = :friend")
+    List<Friendship> findByFriend(@Param("friend") User friend);
+
 }

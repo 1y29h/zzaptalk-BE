@@ -234,14 +234,22 @@ public class ChatRoomService {
 
         // 1:1 채팅방 (SINGLE)은 이름이 null이므로, 상대방의 닉네임을 방 이름으로 사용
         if (chatRoom.getType() == ChatRoomType.SINGLE) {
-            return memberNicknames.stream()
+            String opponentName = memberNicknames.stream()
                     .filter(nickname -> !nickname.equals(currentNickname))
                     .findFirst()
-                    .orElse("알 수 없는 사용자");
+                    .orElse(null);
+
+            // 상대방이 탈퇴한 경우 처리
+            // - memberNicknames에 "알 수 없는 사용자"가 포함되어 있음
+            // - 또는 ChatRoomUser가 삭제되어 memberNicknames가 비어있을 수 있음
+            if (opponentName == null || opponentName.equals("알 수 없는 사용자")) {
+                return "알 수 없는 사용자";
+            }
+
+            return opponentName;
         }
 
         return chatRoom.getName();
-
     }
 
 }

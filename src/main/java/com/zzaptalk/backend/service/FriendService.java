@@ -11,6 +11,8 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.zzaptalk.backend.entity.UserStatus;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -161,6 +163,11 @@ public class FriendService {
 
         } else {
             throw new IllegalArgumentException("올바르지 않은 요청입니다.");
+        }
+
+        // 2. 탈퇴한 유저인지 확인
+        if (friendToAdd.getStatus() == UserStatus.DELETED) {
+            throw new IllegalArgumentException("존재하지 않는 사용자입니다.");
         }
 
         // 2. 자기 자신 추가 방지
